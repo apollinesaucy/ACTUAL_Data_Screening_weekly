@@ -14,14 +14,15 @@ rm(list=ls())
 library(shiny);library(readr);library(tidyr);library(dplyr);library(readxl); library(grid)
 library(lubridate);library(stringr);library(ggplot2);library(pdftools);library(gridExtra);
 
-# week indicator
-week_indicator = "week_1"
+# # week indicator
+week_indicator = "week_3"
 
 # load cleaned recap data locally
-redcap = read_csv("/Volumes/FS/_ISPM/CCH/Actual_Project/data/App_Personal_Data_Screening/redcap_data.csv") |>
+# redcap = read_csv("/Volumes/FS/_ISPM/CCH/Actual_Project/data/App_Personal_Data_Screening/redcap_data.csv") |>
+redcap = read_csv("../redcap_data.csv") |>
     dplyr::mutate(starttime = ymd_hms(starttime),
                   endtime   = ymd_hms(endtime),
-                  redcap_event_name = substr(redcap_event_name, 13,18))|>
+                  redcap_event_name = substr(redcap_event_name, 13,18)) |>
   filter(redcap_event_name == week_indicator)
   
 # function for file pathing

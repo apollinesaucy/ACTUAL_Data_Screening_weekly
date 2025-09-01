@@ -74,7 +74,7 @@ server <- function(input, output, session) {
                           gsub("_", "", redcap_event)
                           , "/")
 
-      # file_path <- paste0("~/SynologyDrive/Participants/ACT072R/week2/")
+      # file_path <- paste0("~/SynologyDrive/Participants/ACT010Z/week3/")
 
     # output the file path to the UI
     output$file_path <- renderText({

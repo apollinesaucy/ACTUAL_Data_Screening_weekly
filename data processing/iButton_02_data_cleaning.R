@@ -13,7 +13,7 @@ library(readr);library(tidyr);library(dplyr);library(readxl);library(zoo)
 library(lubridate);library(stringr);library(ggplot2);library(gridExtra); library(grid)
 
 # specify the week to compile (needs to match naming convention on synology)
-week_indicator = "week_1"
+week_indicator = "week_2"
 
 
 # LOAD and SPLIT DATA
@@ -75,7 +75,7 @@ for(uids in unique(redcap$uid)){
   redcap_subset <- redcap[redcap$uid == uids,]
   
   # loop through pvl visits
-  for(i in nrow(redcap_subset)) {
+  for(i in 1:nrow(redcap_subset)) {
     
     
     startvalue <- redcap_subset$pvl_start[i]
@@ -155,7 +155,7 @@ data_W <- data_W |>
   mutate(IBW_TEMP = if_else(IBW_TEMP < 15 | IBW_TEMP > 45, NA, IBW_TEMP))
 
 # Taped
-thrsh = quantile(data_T$IBT_TEMP, .10)
+thrsh = quantile(data_T$IBT_TEMP, .10, na.rm = T)
 data_T <- data_T |>
   mutate(IBT_TEMP = if_else(IBT_TEMP < thrsh, NA, IBT_TEMP))
 

@@ -15,7 +15,7 @@ library(dplyr); library(ggplot2);library(ggnewscale);library(viridis);library(st
 library(readr); library(GGIR)
 
 # specify the week to compile (needs to match naming convention on synology)
-week_indicator = "week_1"
+week_indicator = "week_3"
 
 # load redcap from CCH for uids and start and end times
 redcap = read_csv("/Volumes/FS/_ISPM/CCH/Actual_Project/data/App_Personal_Data_Screening/redcap_data.csv") |>
@@ -26,13 +26,11 @@ redcap = read_csv("/Volumes/FS/_ISPM/CCH/Actual_Project/data/App_Personal_Data_S
   filter(!(uid %in% c("ACT029U", "ACT034X", "ACT045O"))) |>
   filter(str_starts(uid, "ACT"))
 
-
+uids <- unique(redcap$uid)
 
 
 # STEP 1
 # create the subfolders using the uids from redcap
-uids <- unique(redcap$uid)
-
 for (uid in uids) {
   print(uid)
   folderpath <- paste0("/Volumes/FS/_ISPM/CCH/Actual_Project/data-raw/Actigraph/participants/", week_indicator, "/", uid)
@@ -49,7 +47,7 @@ for (uid in uids) {
 # Step 2
 # copy the .RAW files from the csv folder only of week_1 to the corresponding folder
 files <- list.files("/Volumes/FS/_ISPM/CCH/Actual_Project/data-raw/Actigraph/csv/",
-                    pattern = "ACT.*week1.*RAW.*\\.csv$", 
+                    pattern = "ACT.*week2.*RAW.*\\.csv$", 
                     full.names = TRUE)
 
 for (uid in uids) {

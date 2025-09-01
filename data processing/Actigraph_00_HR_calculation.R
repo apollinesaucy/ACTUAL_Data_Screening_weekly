@@ -14,8 +14,8 @@ rm(list = ls())
 # Set which outputs you want to generate
 generate_hr  <- TRUE   # Heart Rate
 generate_hrv <- TRUE   # Heart Rate Variability
-generate_cr  <- FALSE  # Cardiac Rhythm
-generate_ibi <- FALSE   # Inter-Beat Interval
+generate_cr  <- TRUE  # Cardiac Rhythm
+generate_ibi <- TRUE   # Inter-Beat Interval
 # -----------------------
 
 # Define paths
@@ -30,6 +30,7 @@ raw_files <- list.files(input_dir, pattern = "RAW\\.csv$", full.names = TRUE)
 for (raw_csv in raw_files) {
   # browser()
   base_name <- sub("(\\))RAW\\.csv$", "\\1", basename(raw_csv))
+  print(base_name)
   
   # Construct all possible output paths
   ppg_csv <- file.path(input_dir, paste0(base_name, "ppg25Hz.csv"))

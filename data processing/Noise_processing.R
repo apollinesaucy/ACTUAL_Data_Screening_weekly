@@ -14,7 +14,7 @@ library(readr);library(tidyr);library(dplyr);library(readxl);library(zoo)
 library(lubridate);library(stringr);library(ggplot2);library(gridExtra); library(grid)
 
 # specify the week to compile (needs to match naming convention on synology)
-week_indicator = "week_1"
+week_indicator = "week_2"
 
 
 

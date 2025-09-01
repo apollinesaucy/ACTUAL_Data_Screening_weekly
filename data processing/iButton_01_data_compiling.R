@@ -18,7 +18,7 @@ library(readr);library(tidyr);library(dplyr);library(readxl)
 library(lubridate);library(stringr);library(ggplot2);library(gridExtra); library(grid)
 
 # specify the week to compile (needs to match naming convention on synology)
-week_indicator = "week_1"
+week_indicator = "week_2"
 
 
 # LOAD DATA
@@ -67,9 +67,12 @@ indicators <- data.frame(place = c("IBH", "IBH", "IBT", "IBW", "IBW", ""),
 # loop through unique uids
 for (uid in unique(redcap$uid)) {
   print(uid)
+
+# week indicator!!! -------------------------------------------------------
+
   
    # extract all the files for every uid
-    files_all <- list.files(paste0("~/SynologyDrive/Participants/", uid, "/week1/"), full.names = TRUE) 
+    files_all <- list.files(paste0("~/SynologyDrive/Participants/", uid, "/week2/"), full.names = TRUE) 
     
   # only continue if the folder is not emty
   if (length(files_all) > 0) {

@@ -6,28 +6,25 @@
 
 # in this document I load all the actigraph files from the participants individual
 # folders,  clean them by the PVL and the weartime validation output from the 
-# GGIR routine, rbind them and save them in the data folder without aggregating)
-
-# ! I HAVE YET TO IMPLEMENT THE PVL AND WEARTIME CLEANING OF EACH FILE TYPE
-# AND I ALSO HAVE TO INCLUDE THE SLEEP DATA HERE !
+# GGIR routine, rbind them and save them in the data folder without aggregating
 
 # empty environment
 rm(list = ls())
 
 # libraries
-library(dplyr); library(ggplot2);library(ggnewscale);library(viridis);library(lubridate);library(readr)
+library(lubridate);library(readr);library(tidyverse)
 
 # specify the week to compile (needs to match naming convention on synology)
 week_indicator = "week_1"
 
 # load redcap from CCH for uids and start and end times
-redcap = read_csv("/Volumes/FS/_ISPM/CCH/Actual_Project/data/App_Personal_Data_Screening/redcap_data.csv") |>
-  dplyr::mutate(starttime = ymd_hms(starttime),
-                endtime   = ymd_hms(endtime),
-                redcap_event_name = substr(redcap_event_name, 13,18)) |>
-  filter(redcap_event_name == week_indicator)|>
-  filter(!(uid %in% c("ACT029U", "ACT034X", "ACT045O")))|>
-  filter(str_starts(uid, "ACT"))
+redcap = read_csv("/Volumes/FS/_ISPM/CCH/Actual_Project/data/App_Personal_Data_Screening/redcap_all.csv") |> 
+  select(uid, redcap_event_name, pvl_start, pvl_end, starts_with("pvl_ac")) |>
+  drop_na(pvl_start) |>
+  filter(str_detect(redcap_event_name, week_indicator)) |>
+  filter(!(uid %in% c("ACT029U", "ACT034X", "ACT045O"))) |>
+  filter(str_starts(uid, "ACT")) |>
+  filter(pvl_actigraph == 1)  # keep only pvls with actions on the actigraph 
 
 # vector of all uids
 uids <- unique(redcap$uid)
@@ -42,11 +39,23 @@ df_HRV <- data.frame()
 df_IBI <- data.frame()
 df_STEPS <- data.frame()
 df_Temp <- data.frame()
+df_WT <- data.frame()
+
+# dummy participant for script dev
+# redcap <- redcap |>
+#   filter(str_starts(uid, "ACT044"))
+# redcap <- redcap |>
+#   filter(str_starts(uid, "ACT00"))
+# uids <- unique(redcap$uid)
+
 
 # loop over all participants
 for(uidx in uids){
   
   print(uidx)
+  
+  redcap_uid <- redcap |>
+    filter(uid == uidx)
   
   # list the files in the folder of the participant
   files_uid <- list.files(paste0(filepath_part, uidx, "/"))
@@ -58,46 +67,115 @@ for(uidx in uids){
   file_IBI <- files_uid[grepl("IBI", files_uid)]
   file_STEPS <- files_uid[grepl("Steps", files_uid)]
   file_Temp <- files_uid[grepl("Temp", files_uid)]
+  file_WTvalidation <- files_uid[grepl("validation_RAW", files_uid)]
   
-  # rbind the files if they exist
+  if (length(file_WTvalidation) != 0) {
+    
+    # load weartime validation and cut by observation period
+    wt <- read_csv(paste0(filepath_part, uidx, "/", file_WTvalidation)) |>
+      filter(datetime >= min(redcap_uid$pvl_end) & datetime <= max(redcap_uid$pvl_start))
+    
+    # set weartime manually to NO WT when there was a pvl
+    # 0 for valid, 1 for invalid
+    # loop through pvl visits
+    for(i in 1:nrow(redcap_uid)) {
+      
+      startvalue <- redcap_uid$pvl_start[i]
+      endvalue <-  redcap_uid$pvl_end[i]
+      
+      # set values to 1 for invalid during pvl visits
+      wt <- wt |>
+        mutate(invalidepoch = if_else(datetime > startvalue & datetime < endvalue, 1, invalidepoch))
+      
+      df_WT <- rbind(df_WT, wt)
+    }
+    
+  } else{
+    print(paste0("skipping...no weartime validation data for participant: ",uidx))
+      next}
+  
+
+  
+  # rbind the files if they exist and
+  # cleaning based on weartime validation
   if(length(file_CR) != 0){
-    data = read_csv(paste0(filepath_part, uidx, "/", file_CR))
+    data = read_csv(paste0(filepath_part, uidx, "/", file_CR)) |>
+      mutate(datetime = floor_date(start_timestamp, unit = "minutes")) |>
+      left_join(wt |> select(datetime, invalidepoch), by = "datetime") |>
+      mutate(bout_length_seconds = if_else(is.na(invalidepoch) | invalidepoch == 1, NA, bout_length_seconds)) |>
+      filter(datetime >= min(redcap_uid$pvl_end) & datetime <= max(redcap_uid$pvl_start))
+    
     df_CR <- rbind(df_CR, data)
   }
   if(length(file_HR) != 0){
-    data = read_csv(paste0(filepath_part, uidx, "/", file_HR))
+    data = read_csv(paste0(filepath_part, uidx, "/", file_HR))|>
+      mutate(datetime = timestamp) |>
+      left_join(wt |> select(datetime, invalidepoch), by = "datetime") |>
+      mutate(HeartRate = if_else(is.na(invalidepoch) | invalidepoch == 1, NA, HeartRate)) |>
+      filter(datetime >= min(redcap_uid$pvl_end) & datetime <= max(redcap_uid$pvl_start))
+    
     df_HR <- rbind(df_HR, data)
   }
   if(length(file_HRV) != 0){
     data = read_csv(paste0(filepath_part, uidx, "/", file_HRV))
+    
+    colname <- names(data)[1]
+    
+    data <- data |>
+      mutate(datetime = floor_date(.data[[colname]], unit = "minutes")) |>
+      left_join(wt |> select(datetime, invalidepoch), by = "datetime")
+    
+    cols_to_clean <- data %>%
+      select(-c(datetime, uid, invalidepoch)) %>%
+      select(where(is.numeric)) %>%
+      names()
+    
+    data <- data |>
+      mutate(across(all_of(cols_to_clean),
+                    ~ if_else(is.na(invalidepoch) | invalidepoch == 1, NA_real_, .))) |>
+      filter(datetime >= min(redcap_uid$pvl_end) & datetime <= max(redcap_uid$pvl_start))
+    
+    if (ncol(data) > 16) {
+      data <- data |>
+        select(-end, -hrv_epoch_start, -hrv_epoch_end) |>
+        rename("timestamp" = "start")
+      }
+    
     df_HRV <- rbind(df_HRV, data)
   }
   if(length(file_IBI) != 0){
-    data = read_csv(paste0(filepath_part, uidx, "/", file_IBI))
+    data = read_csv(paste0(filepath_part, uidx, "/", file_IBI))|>
+      mutate(datetime = floor_date(timestamp, unit = "minutes")) |>
+      left_join(wt |> select(datetime, invalidepoch), by = "datetime") |>
+      mutate(interbeat_interval = if_else(is.na(invalidepoch) | invalidepoch == 1, NA, interbeat_interval)) |>
+      filter(datetime >= min(redcap_uid$pvl_end) & datetime <= max(redcap_uid$pvl_start))
+    
     df_IBI <- rbind(df_IBI, data)
   }
   if(length(file_STEPS) != 0){
-    data = read_csv(paste0(filepath_part, uidx, "/", file_STEPS))
+    data = read_csv(paste0(filepath_part, uidx, "/", file_STEPS))|>
+      mutate(datetime = floor_date(timestamp, unit = "minutes")) |>
+      left_join(wt |> select(datetime, invalidepoch), by = "datetime") |>
+      mutate(steps = if_else(is.na(invalidepoch) | invalidepoch == 1, NA, steps)) |>
+      filter(datetime >= min(redcap_uid$pvl_end) & datetime <= max(redcap_uid$pvl_start))
+    
     df_STEPS <- rbind(df_STEPS, data)
   }
   if(length(file_Temp) != 0){
-    data = read_csv(paste0(filepath_part, uidx, "/", file_Temp))
+    data = read_csv(paste0(filepath_part, uidx, "/", file_Temp))|>
+      left_join(wt |> select(datetime, invalidepoch), by = "datetime") |>
+      mutate(Temperature = if_else(is.na(invalidepoch) | invalidepoch == 1, NA, Temperature)) |>
+      filter(datetime >= min(redcap_uid$pvl_end) & datetime <= max(redcap_uid$pvl_start))
     df_Temp <- rbind(df_Temp, data)
   }
 }
 
-# df_CR <- data.frame()
-# df_HR <- data.frame()
-# df_HRV <- data.frame()
-# df_IBI <- data.frame()
-# df_STEPS <- data.frame()
-# df_Temp <- data.frame()
-
 # save the cleaned but RAW resolution data
-write_csv(df_CR, paste0("/Volumes/FS/_ISPM/CCH/Actual_Project/data/Participants/", week_indicator, "/", week_indicator, "_actigraph_CR_RAW.csv"))
-write_csv(df_HR, paste0("/Volumes/FS/_ISPM/CCH/Actual_Project/data/Participants/", week_indicator, "/", week_indicator, "_actigraph_HR_RAW.csv"))
-write_csv(df_HRV, paste0("/Volumes/FS/_ISPM/CCH/Actual_Project/data/Participants/", week_indicator, "/", week_indicator, "_actigraph_HRV_RAW.csv"))
-write_csv(df_IBI, paste0("/Volumes/FS/_ISPM/CCH/Actual_Project/data/Participants/", week_indicator, "/", week_indicator, "_actigraph_IBI_RAW.csv"))
-write_csv(df_STEPS, paste0("/Volumes/FS/_ISPM/CCH/Actual_Project/data/Participants/", week_indicator, "/", week_indicator, "_actigraph_Steps_RAW.csv"))
-write_csv(df_Temp, paste0("/Volumes/FS/_ISPM/CCH/Actual_Project/data/Participants/", week_indicator, "/", week_indicator, "_actigraph_Temp_RAW.csv"))
+write_csv(df_CR, paste0("/Volumes/FS/_ISPM/CCH/Actual_Project/data/Participants/", week_indicator, "/", week_indicator, "_actigraph_CR_RAW_data_clean.csv"))
+write_csv(df_HR, paste0("/Volumes/FS/_ISPM/CCH/Actual_Project/data/Participants/", week_indicator, "/", week_indicator, "_actigraph_HR_RAW_data_clean.csv"))
+write_csv(df_HRV, paste0("/Volumes/FS/_ISPM/CCH/Actual_Project/data/Participants/", week_indicator, "/", week_indicator, "_actigraph_HRV_RAW_data_clean.csv"))
+write_csv(df_IBI, paste0("/Volumes/FS/_ISPM/CCH/Actual_Project/data/Participants/", week_indicator, "/", week_indicator, "_actigraph_IBI_RAW_data_clean.csv"))
+write_csv(df_STEPS, paste0("/Volumes/FS/_ISPM/CCH/Actual_Project/data/Participants/", week_indicator, "/", week_indicator, "_actigraph_Steps_RAW_data_clean.csv"))
+write_csv(df_Temp, paste0("/Volumes/FS/_ISPM/CCH/Actual_Project/data/Participants/", week_indicator, "/", week_indicator, "_actigraph_Temp_RAW_data_clean.csv"))
+write_csv(df_WT, paste0("/Volumes/FS/_ISPM/CCH/Actual_Project/data/Participants/", week_indicator, "/", week_indicator, "_actigraph_weartime_RAW_data_clean.csv"))
 

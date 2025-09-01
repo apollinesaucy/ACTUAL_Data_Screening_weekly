@@ -14,13 +14,7 @@
 # DONT SAVE THIS FILE WITH THE TOKEN
 
 
-library(httr)
-library(jsonlite)
-library(dplyr)
-library(stringr)
-library(lubridate)
-
-
+library(httr);library(jsonlite);library(dplyr);library(stringr);library(lubridate)
 rm(list=ls())
 
 
@@ -52,7 +46,9 @@ if (http_status(response)$category == "Success") {
 
 # save all the data to CCH
 # Save dataset
+# write.csv(data, "../redcap_all.csv")
 write.csv(data, "/Volumes/FS/_ISPM/CCH/Actual_Project/data/App_Personal_Data_Screening/redcap_all.csv")
+
 
 # select necessary columns and convert to datetime
 # return min pvl_end as a start time of the observation week
@@ -93,6 +89,8 @@ data_selected <- data |>
 
 # Save dataset
 write.csv(data_selected, "/Volumes/FS/_ISPM/CCH/Actual_Project/data/App_Personal_Data_Screening/redcap_data.csv")
+write.csv(data_selected, "../redcap_data.csv")
+
 print("data uploaded")
 
 

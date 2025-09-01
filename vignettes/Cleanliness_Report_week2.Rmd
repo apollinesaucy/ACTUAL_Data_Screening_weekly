@@ -1,0 +1,363 @@
+---
+title: "Cleanliness Report Week 1"
+author: "Tino Schneidewind"
+date: "2025-04-22"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+## Objective
+
+Here we investigate both the **completeness of the data collection** as well as the **impact of the data cleaning** on data availability. For both we compare hourly averages of house temperature+humidity, worn temperature+humidity, taped temperature, and noise. 
+
+```{r load data, echo = FALSE, message=FALSE, warning=FALSE}
+# clean environment
+rm(list=ls())
+
+# libraries
+library(readr);library(tidyr);library(dplyr);library(readxl);library(zoo);library(naniar);library(reshape2)
+library(lubridate);library(stringr);library(ggplot2);library(gridExtra); library(grid); library(visdat)
+
+# week indicator
+week_indicator = "week_2"
+# data
+data_clean = read_csv(paste0("/Volumes/FS/_ISPM/CCH/Actual_Project/data/Participants/", week_indicator, "/", week_indicator,  "_IB_hourly_data_clean.csv"))
+data_unclean = read_csv(paste0("/Volumes/FS/_ISPM/CCH/Actual_Project/data-raw/Participants/", week_indicator, "_IB_hourly_data_unclean.csv"))
+```
+
+First lets look at all the missing data divided into the 6 variables of interest in the uncleaned and cleaned data sets
+
+### Unclean data 
+
+```{r missing data plots for uncleaned data, echo=FALSE, fig.align="center", fig.height=12, fig.width=12}
+# PLOT 1
+# shows clear where we have missing data per variable
+plot1 <- vis_miss(data_unclean[,4:8])+
+  theme(axis.text.x = element_text(angle = 90)) +
+  ylab("measurements across participants")
+
+
+# PLOT 2
+# shows clear where we have missing data per uid
+plot2 <- gg_miss_fct(data_unclean |> select(everything(), -datetime, -id_time), fct = uid) +
+  labs(title = "",
+       x = "",
+       y = "") +
+  coord_flip() +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 90))
+
+
+# Plot 3
+# Missing rows per uid
+
+plot3 <- data_unclean %>%
+  select(everything(), -datetime, -id_time) %>%
+  group_by(uid) %>%
+  summarise(
+    n_missing = sum(is.na(across(everything()))),
+    pct_missing = mean(is.na(across(everything()))) * 100
+  ) |> # Step 2: Plot with labels
+  ggplot(aes(x = uid, y = n_missing)) +
+  geom_col(fill = "tomato") +
+  geom_text(aes(label = paste0(round(pct_missing, 1), "%")), 
+            hjust = -0.1, size = 3) +
+  coord_flip() +
+  labs(title = "",
+       x = "",
+       y = "") +
+  theme_minimal() 
+
+grid.arrange(plot1, plot2, plot3, ncol = 3)
+```
+
+We can see that the **missing data is organized in blocks** (left figure) with a total sum of 3.6%. So the missing data **originates from whole files being missing** or consisting only of missing data as one of the larger blocks corresponds to one participant. This we can see again in the center plots where **most participants have complete unclean data** indicated by the purple with only 10 participants having one or multiple files missing. We see this consistency across most participants again as very low percentages in the right plots.  
+
+### Clean data
+
+
+```{r missing data plots for cleaned data, echo= FALSE, fig.width=12, fig.align="center", fig.height=12}
+# PLOT 1
+# shows clear where we have missing data per variable
+plot1 <- vis_miss(data_clean[,4:8])+
+  theme(axis.text.x = element_text(angle = 90)) +
+  ylab("measurements across participants")
+
+
+# PLOT 2
+# shows clear where we have missing data per uid
+plot2 <- gg_miss_fct(data_clean |> select(everything(), -datetime, -uid_time), fct = uid) +
+  labs(title = "",
+       x = "",
+       y = "") +
+  coord_flip() +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 90))
+
+
+# Plot 3
+# Missing rows per uid
+plot3 <- data_clean %>%
+  select(everything(), -datetime, -uid_time) %>%
+  group_by(uid) %>%
+  summarise(
+    n_missing = sum(is.na(across(everything()))),
+    pct_missing = mean(is.na(across(everything()))) * 100
+  ) |> # Step 2: Plot with labels
+  ggplot(aes(x = uid, y = n_missing)) +
+  geom_col(fill = "tomato") +
+  geom_text(aes(label = paste0(round(pct_missing, 1), "%")), 
+            hjust = -0.1, size = 3) +
+  coord_flip() +
+  labs(title = "",
+       x = "",
+       y = "") +
+  theme_minimal() 
+
+grid.arrange(plot1, plot2, plot3, ncol = 3)
+```
+
+In the left plot we can see that there is sporadic missing data for house measurements which was taken outside the observation period or inside the pvl visits if the device was changed. The cleaning did not really affect the percentage of missing data (5%). Moving to noise, we dont see a change in the available data because we filtered only for impossible and implausible values. In taped temperature, we additionally cleaned the data for periods where the device was not taped on the person which was detected by a severe drop in temperature. These temperature changes were very abrupt and often not longlived (not shown here), and consequently the hourly averaging of the 15-minute values filled quite a bit of these missing values created by the cleaning. The missingness for taped temperature increased from 2-8% because of the cleaning. Most severly impacted by the cleaning was worn temperature and humidity (likely because they are easier to take of and were taken of for longer periods which were then filled less effectively than taped devices). I increased the threshold for the cleaning for this device from the one in the data cleaning revised report (from 0.75 moving average standard deviation over 4 measurements (1h) to 1 MASD over 2 measurements) because some of the cleaned measurements were then again filled by the averaging process with values that very likely did not represent worn temperature but the house temperature. THIS CAN BE DISCUSSED IN THE FUTURE and I will build an app to compare the data before and after cleaning for this purpose. Thats why the missingness for worn data increased from 2-15%. This again is visible per participant in the center and left plot with multiple participant having concerning missing data percentages to which the "rules" of this study should be maybe be explained again. 
+
+the percentage of rows with missing data in them
+```{r perc of missing rows}
+na_rows_ratio <- sum(apply(data_clean, 1, function(row) any(is.na(row)))) / nrow(data_clean)
+na_rows_ratio
+```
+
+### Diurnal cycle of missing data
+
+The diurnal cycle of the missing data could serve as a indicator what "advice" we could give participants to ensure better data for future weeks of observations.
+
+```{r diurnal cycle, echo= FALSE, fig.width=8, fig.align="center", fig.height=4}
+# diurnal cycle data
+dc_missing <- data_clean |>
+  mutate(hour = hour(datetime)) |>
+  select(-uid, -uid_time, -datetime) |>
+  group_by(hour) |>
+  summarise(
+    na_perc = sum(is.na(across(everything()))) / (n() * ncol(across(everything())))
+  )
+
+# diurnal cycle plot missing data
+ggplot(dc_missing, aes(x = hour, y = na_perc)) +
+  geom_point(color = "red", size = 2) +
+  scale_y_continuous(labels = scales::percent_format(accuracy = 1)) +
+  labs(title = "Percentage of Missing Data Over Time",
+       x = "Datetime",
+       y = "% Missing") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+```
+
+### Timeseries of missing data
+
+```{r timeserie, echo= FALSE, fig.width=8, fig.align="center", fig.height=4}
+# time series missing data
+ts_missing <- data_clean |>
+  select(-uid, -uid_time) |>
+  group_by(datetime) |>
+  summarise(
+    na_perc = sum(is.na(across(everything()))) / (n() * ncol(across(everything())))
+  )
+
+# plot time series missing data
+ggplot(ts_missing, aes(x = datetime, y = na_perc)) +
+  geom_point(color = "red", size = 2) +
+  scale_y_continuous(labels = scales::percent_format(accuracy = 1)) +
+  labs(title = "Percentage of Missing Data Over Time",
+       x = "Datetime",
+       y = "% Missing") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+```
+
+
+### Desciptive statistics
+
+#### Distributions
+
+```{r data distribtuione, echo = FALSE, warning=FALSE, message=FALSE, fig.align='center', fig.height=4, fig.width=8}
+plot1 <- ggplot(data_clean, aes(x = IBH_HUM)) +
+  geom_histogram(fill = "skyblue1", color = "black",
+                 aes(y = ..density..),
+                 bins = 30, 
+                 alpha = 0.6) + 
+  labs(x = "humidity [%]", y = "density", title = "House - Humidity") +
+  lims(x = c(0,100)) +
+  theme_classic()
+
+
+plot2 <- ggplot(data_clean, aes(x = IBW_HUM)) +
+  geom_histogram(fill = "skyblue1", color = "black",
+                 aes(y = ..density..),
+                 bins = 30, 
+                 alpha = 0.6) + 
+  labs(x = "humidity [%]", y = "density", title = "Worn - Humidity") +
+  lims(x = c(0,100)) +
+  theme_classic()
+
+
+plot3 <- ggplot(data_clean, aes(x = IBH_TEMP)) +
+  geom_histogram(fill = "brown3", color = "black",
+                 aes(y = ..density..),
+                 bins = 30, 
+                 alpha = 0.6) + 
+  labs(x = "temperature [°C]", y = "density", title = "House - Temperature") +
+  lims(x = c(15,45)) +
+  theme_classic()
+
+plot4 <- ggplot(data_clean, aes(x = IBW_TEMP)) +
+  geom_histogram(fill = "brown3", color = "black",
+                 aes(y = ..density..),
+                 bins = 30, 
+                 alpha = 0.6) + 
+  labs(x = "temperature [°C]", y = "density", title = "Worn - Temperature") +
+  lims(x = c(15,45)) +
+  theme_classic()
+
+# plot5 <- ggplot(data_clean, aes(x = NS)) +
+#   geom_histogram(fill = "grey", color = "black",
+#                  aes(y = ..density..),
+#                  bins = 30, 
+#                  alpha = 0.6) + 
+#   labs(x = "noise [dB]", y = "density", title = "House - Noise") +
+#   lims(x = c(15,90)) +
+#   theme_classic()
+
+plot6 <- ggplot(data_clean, aes(x = IBT_TEMP)) +
+  geom_histogram(fill = "brown3", color = "black",
+                 aes(y = ..density..),
+                 bins = 30, 
+                 alpha = 0.6) + 
+  labs(x = "temperature [°C]", y = "density", title = "Taped - Temperature") +
+  lims(x = c(15,45)) +
+  theme_classic()
+
+grid.arrange(plot1, plot2, plot3, plot4,  plot6, nrow = 2)
+
+```
+
+#### Diurnal cycle
+
+```{r data diurnal, echo = FALSE, warning=FALSE, message=FALSE, fig.align='center', fig.height=5.5, fig.width=7}
+diurnal_cycle <- data_clean |>
+  mutate(hourly = hour(datetime)) |>
+  group_by(hourly) |>
+  summarise(IBH_HUM = mean(IBH_HUM, na.rm = TRUE),
+            IBH_TEMP = mean(IBH_TEMP, na.rm = TRUE),
+            IBW_HUM = mean(IBW_HUM, na.rm = TRUE),
+            IBW_TEMP = mean(IBW_TEMP, na.rm = TRUE),
+            IBT_TEMP = mean(IBT_TEMP, na.rm = TRUE),
+            # NS = mean(NS, na.rm = TRUE)
+            ) |>
+  mutate(hourly = as.numeric(hourly)) |>
+  na.omit()
+
+
+plot1 <- ggplot(diurnal_cycle, aes(x = hourly)) + 
+  geom_line(aes(y = IBH_HUM, color = "House"), size = 1.2) + 
+  geom_line(aes(y = IBW_HUM, color = "Worn"), size = 1.2) + 
+  labs(
+    x = "hour of the day", 
+    y = "humidity [%]", 
+    title = "Humidity",
+    color = "Legend"  # Title for the legend
+  ) +
+  lims(y = c(20,50)) +
+  scale_color_manual(values = c("House" = "skyblue", "Worn" = "skyblue4"),
+                     breaks = c("Worn", "House")) + 
+  theme_classic()
+
+
+plot2 <- ggplot(diurnal_cycle, aes(x = hourly)) + 
+  geom_line(aes(y = IBH_TEMP, color = "House"), size = 1.2) + 
+  geom_line(aes(y = IBW_TEMP, color = "Worn"), size = 1.2) + 
+  geom_line(aes(y = IBT_TEMP, color = "Taped"), size = 1.2) + 
+  labs(
+    x = "hour of the day", 
+    y = "temperature [°C]", 
+    title = "Temperature",
+    color = "Legend"  # Title for the legend
+  ) +
+  lims(y = c(22,40)) +
+  scale_color_manual(
+    values = c("House" = "red", "Worn" = "brown3", "Taped" = "brown4"), 
+    breaks = c("Taped", "Worn", "House")  # Set the desired legend order
+  ) +
+  theme_classic()
+
+
+# plot3 <- ggplot(diurnal_cycle, aes(x = hourly)) + 
+#   geom_line(aes(y = NS, color = "Noise"), size = 1.2) + 
+#   labs(
+#     x = "hour of the day", 
+#     y = "noise [dB]", 
+#     title = "Noise",
+#     color = "Legend"
+#   ) +
+#   lims(y = c(40,60)) +
+#     scale_color_manual(
+#     values = c("Noise" = "darkgrey")) +
+#   theme_classic()
+
+grid.arrange(plot1, plot2, ncol = 1)
+```
+
+#### Scatterplots
+
+```{r scatterl interdevice, echo=FALSE, fig.align='center', fig.height=6, fig.width=7, warning=FALSE, message=FALSE}
+plot4 <- ggplot(data_clean, aes(x = IBH_TEMP, y = IBT_TEMP)) +
+  geom_point(size = 0.7, color = "brown2") +
+  labs(x = "temperature [°C]", y = "temperature [°C]", title = "House x Taped") +
+  theme_classic()
+
+
+plot5 <- ggplot(data_clean, aes(x = IBW_TEMP, y = IBT_TEMP)) +
+  geom_point(size = 0.7, color = "brown2") +
+  labs(x = "temperature [°C]", y = "temperature [°C]", title = "Worn x Taped") +
+  theme_classic()
+
+
+
+plot6 <- ggplot(data_clean, aes(x = IBW_TEMP, y = IBH_TEMP)) +
+  geom_point(size = 0.7, color = "brown2", alpha = 0.7) +
+  labs(x = "temperature [°C]", y = "temperature [°C]", title = "Worn x House") +
+  theme_classic()
+
+# plot7 <- ggplot(data_clean, aes(x = IBH_TEMP, y = NS)) +
+#   geom_point(size = 0.7, color = "#884848") +
+#   labs(x = "temperature [°C]", y = "noise [dB]", title = "House") +
+#   theme_classic()
+
+
+grid.arrange(plot4, plot5,  plot6, nrow = 2)
+```
+
+#### Heatmap
+
+```{r heatmap, echo = FALSE, fig.align='center', fig.height=4, fig.width=6}
+
+cor_matrix <- cor(data_clean[,4:8], use = "pairwise.complete.obs")
+
+cor_long <- melt(cor_matrix)
+
+ggplot(cor_long, aes(Var1, Var2, fill = value)) +
+  geom_tile(color = "white") +
+  scale_fill_gradient2(low = "blue", high = "red", mid = "white",
+                       midpoint = 0, limit = c(-1, 1), space = "Lab",
+                       name = "Correlation") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, vjust = 1, hjust = 1),
+        axis.title = element_blank()) +
+  coord_fixed()
+
+```
+
+
+
+

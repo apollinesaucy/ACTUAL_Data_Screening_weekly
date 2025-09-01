@@ -13,7 +13,7 @@ library(dplyr); library(tidyverse); library(ggplot2); library(grid); library(gri
 library(readxl);library(knitr);library(lubridate); library(readr);library(zoo);library(fuzzyjoin)
 
 rm(list = ls())
-source("../MACorWIN.R")
+# source("../MACorWIN.R")
 ```
 
 ## Data Cleaning Protocol (revised)
@@ -35,20 +35,24 @@ The steps of cleaning after revision are the following:
 
 ```{r load redcap, echo = FALSE, warning=FALSE, message=FALSE}
 # REDCap for uids and start and end times
-redcap = read_csv("/Volumes/FS/_ISPM/CCH/Actual_Project/data/App_Personal_Data_Screening/redcap_all.csv")
+# redcap = read_csv("/Volumes/FS/_ISPM/CCH/Actual_Project/data/App_Personal_Data_Screening/redcap_data.csv")
+redcap <- read_csv("../../redcap_all.csv")
 
-redcap_pvl <- redcap |>
+redcap_pvl <-  redcap |>
   select( uid, redcap_event_name, pvl_start, pvl_end,pvl_ibuthouse, pvl_ibutworn, pvl_ibuttaped) |>
   filter(!is.na(pvl_start)) |>
-  filter(uid %in% c("ACT001D", "ACT003C", "ACT004S", "ACT014F", "ACT032V")) 
+  filter(uid %in% c("ACT057R", "ACT028W", "ACT016N", "ACT067C", "ACT043W"))  |>
+  mutate(redcap_event_name = substr(redcap_event_name, 13,18)) |>
+  filter(redcap_event_name == "week_2")
+
 
 ```
 
 
 ```{r data, message=FALSE, warning=FALSE, echo=FALSE}
 # uncleaned but selected by pvl
-data = read_csv("/Volumes/FS/_ISPM/CCH/Actual_Project/data/App_Personal_Data_Screening/week1_minute_data_unclean.csv") |>
-    filter(uid %in% c("ACT001D", "ACT003C", "ACT004S", "ACT014F", "ACT032V")) |>
+data = read_csv("/Volumes/FS/_ISPM/CCH/Actual_Project/data/App_Personal_Data_Screening/week_2_minute_data_unclean.csv") |>
+   filter(uid %in% c("ACT057R", "ACT028W", "ACT016N", "ACT067C", "ACT043W"))  |>
     mutate(Variable = str_replace(Variable, "_NS", "NS"))
 
 # house data
