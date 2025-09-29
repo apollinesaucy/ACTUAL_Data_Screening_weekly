@@ -1,4 +1,4 @@
-################################################################################
+###############################################################################
 ### Actigraph variables relocation
 ################################################################################
 
@@ -15,8 +15,8 @@ rm(list = ls())
 library(dplyr); library(ggplot2);library(ggnewscale);library(viridis);library(lubridate);library(readr)
 
 # week indicator
-week_indicator = "week_3"
-week_indicator2 = "week3"
+week_indicator = "week_2"
+week_indicator2 = "week2"
 
 # load redcap from CCH for uids and start and end times
 redcap = read_csv("/Volumes/FS/_ISPM/CCH/Actual_Project/data/App_Personal_Data_Screening/redcap_data.csv") |>
@@ -24,7 +24,7 @@ redcap = read_csv("/Volumes/FS/_ISPM/CCH/Actual_Project/data/App_Personal_Data_S
                   endtime   = ymd_hms(endtime),
                   redcap_event_name = substr(redcap_event_name, 13,18)) |>
   filter(redcap_event_name == week_indicator)|>
-  filter(!(uid %in% c("ACT029U", "ACT034X", "ACT045O"))) |>
+  filter(!(uid %in% c("ACT029U", "ACT034X", "ACT045O", "ACT048L", "ACT051G", "ACT060E"))) |>
   filter(str_starts(uid, "ACT"))
 
 # vector of all uids
@@ -107,16 +107,20 @@ for(uid in uids){
     
     if (!file.exists(output_file_Temp)) {
       Temp <- read_csv(paste0("/Volumes/FS/_ISPM/CCH/Actual_Project/data-raw/Actigraph/csv/", filename_Temp), skip = 9)
+      # Temp <- read_csv(paste0("/Volumes/FS/_ISPM/CCH/Actual_Project/data-raw/Actigraph/csv/", filename_Temp), skip = 11)
       
       # construct datetime series for TEMP
       date_TEMP <- colnames(read_csv(paste0("/Volumes/FS/_ISPM/CCH/Actual_Project/data-raw/Actigraph/csv/", filename_Temp), skip = 3))
       time_TEMP <- colnames(read_csv(paste0("/Volumes/FS/_ISPM/CCH/Actual_Project/data-raw/Actigraph/csv/", filename_Temp), skip = 2))
+      # date_TEMP <- colnames(read_csv(paste0("/Volumes/FS/_ISPM/CCH/Actual_Project/data-raw/Actigraph/csv/", filename_Temp), skip = 5))
+      # time_TEMP <- colnames(read_csv(paste0("/Volumes/FS/_ISPM/CCH/Actual_Project/data-raw/Actigraph/csv/", filename_Temp), skip = 4))
       
       # extract time and date
       time_str <- sub("Start Time ", "", time_TEMP)
       date_str <- sub("Start Date ", "", date_TEMP)
-      start_datetime <- as.POSIXct(paste(date_str, time_str), format = "%d/%m/%Y %H:%M:%S")
+      start_datetime <- as.POSIXct(paste(date_str, time_str), format = "%d.%m.%Y %H:%M:%S")
       
+      if(length(date_TEMP) != 0){
       # create minute sequence
       Temp$datetime <- seq(from = start_datetime, by = "60 sec", length.out = nrow(Temp))
       
@@ -125,6 +129,7 @@ for(uid in uids){
       
       # write new temperature file
       write_csv(Temp, output_file_Temp)
+      } else (print("Temp datetime empty"))
     }
   }
   

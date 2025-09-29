@@ -22,7 +22,7 @@ redcap = read_csv("/Volumes/FS/_ISPM/CCH/Actual_Project/data/App_Personal_Data_S
   select(uid, redcap_event_name, pvl_start, pvl_end, starts_with("pvl_ac")) |>
   drop_na(pvl_start) |>
   filter(str_detect(redcap_event_name, week_indicator)) |>
-  filter(!(uid %in% c("ACT029U", "ACT034X", "ACT045O"))) |>
+  filter(!(uid %in% c("ACT029U", "ACT034X", "ACT045O", "ACT048L", "ACT051G", "ACT060E"))) |>
   filter(str_starts(uid, "ACT")) |>
   filter(pvl_actigraph == 1)  # keep only pvls with actions on the actigraph 
 
@@ -85,7 +85,8 @@ for(uidx in uids){
       
       # set values to 1 for invalid during pvl visits
       wt <- wt |>
-        mutate(invalidepoch = if_else(datetime > startvalue & datetime < endvalue, 1, invalidepoch))
+        mutate(invalidepoch = if_else(datetime > startvalue & datetime < endvalue, 1, invalidepoch),
+               uid = uidx) 
       
       df_WT <- rbind(df_WT, wt)
     }
@@ -99,16 +100,29 @@ for(uidx in uids){
   # rbind the files if they exist and
   # cleaning based on weartime validation
   if(length(file_CR) != 0){
-    data = read_csv(paste0(filepath_part, uidx, "/", file_CR)) |>
+    data = read_csv(paste0(filepath_part, uidx, "/", file_CR))
+    
+    if (nrow(data) != 0) {
+    
+    data <- data |>
       mutate(datetime = floor_date(start_timestamp, unit = "minutes")) |>
       left_join(wt |> select(datetime, invalidepoch), by = "datetime") |>
       mutate(bout_length_seconds = if_else(is.na(invalidepoch) | invalidepoch == 1, NA, bout_length_seconds)) |>
       filter(datetime >= min(redcap_uid$pvl_end) & datetime <= max(redcap_uid$pvl_start))
     
+
+    # remove non matching not necessary columns
+    data <- data[ , !(names(data) %in% c("index", "start", "end"))]
+    
     df_CR <- rbind(df_CR, data)
+    }
   }
   if(length(file_HR) != 0){
-    data = read_csv(paste0(filepath_part, uidx, "/", file_HR))|>
+    data = read_csv(paste0(filepath_part, uidx, "/", file_HR))
+    
+    if (nrow(data) != 0) {
+      
+    data <- data |>
       mutate(datetime = timestamp) |>
       left_join(wt |> select(datetime, invalidepoch), by = "datetime") |>
       mutate(HeartRate = if_else(is.na(invalidepoch) | invalidepoch == 1, NA, HeartRate)) |>
@@ -116,9 +130,12 @@ for(uidx in uids){
     
     df_HR <- rbind(df_HR, data)
   }
+  }
   if(length(file_HRV) != 0){
     data = read_csv(paste0(filepath_part, uidx, "/", file_HRV))
     
+    if (nrow(data) != 0) {
+  
     colname <- names(data)[1]
     
     data <- data |>
@@ -142,18 +159,30 @@ for(uidx in uids){
       }
     
     df_HRV <- rbind(df_HRV, data)
+    }
   }
   if(length(file_IBI) != 0){
-    data = read_csv(paste0(filepath_part, uidx, "/", file_IBI))|>
+    data = read_csv(paste0(filepath_part, uidx, "/", file_IBI))
+    
+    if (nrow(data) != 0) {
+      
+    data <- data |>
       mutate(datetime = floor_date(timestamp, unit = "minutes")) |>
       left_join(wt |> select(datetime, invalidepoch), by = "datetime") |>
       mutate(interbeat_interval = if_else(is.na(invalidepoch) | invalidepoch == 1, NA, interbeat_interval)) |>
       filter(datetime >= min(redcap_uid$pvl_end) & datetime <= max(redcap_uid$pvl_start))
     
     df_IBI <- rbind(df_IBI, data)
-  }
+    }
+    }
+    
   if(length(file_STEPS) != 0){
-    data = read_csv(paste0(filepath_part, uidx, "/", file_STEPS))|>
+    
+    data = read_csv(paste0(filepath_part, uidx, "/", file_STEPS))
+    
+    if(nrow(data) != 0){
+    
+    data = data |>
       mutate(datetime = floor_date(timestamp, unit = "minutes")) |>
       left_join(wt |> select(datetime, invalidepoch), by = "datetime") |>
       mutate(steps = if_else(is.na(invalidepoch) | invalidepoch == 1, NA, steps)) |>
@@ -161,12 +190,23 @@ for(uidx in uids){
     
     df_STEPS <- rbind(df_STEPS, data)
   }
+  }
   if(length(file_Temp) != 0){
-    data = read_csv(paste0(filepath_part, uidx, "/", file_Temp))|>
+    
+    data = read_csv(paste0(filepath_part, uidx, "/", file_Temp))
+    
+    if(nrow(data) != 0){
+      
+    data <- data |>
       left_join(wt |> select(datetime, invalidepoch), by = "datetime") |>
       mutate(Temperature = if_else(is.na(invalidepoch) | invalidepoch == 1, NA, Temperature)) |>
       filter(datetime >= min(redcap_uid$pvl_end) & datetime <= max(redcap_uid$pvl_start))
+    
+    # remove non matching not necessary columns
+    data <- data[ , !(names(data) %in% c("Timestamp"))]
+    
     df_Temp <- rbind(df_Temp, data)
+    }
   }
 }
 

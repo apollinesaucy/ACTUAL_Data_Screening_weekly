@@ -7,8 +7,6 @@
 # In this document, I load all the chosen output from every participant (acceleration 
 # and sleep, and save it in the top folder of every participant
 
-# ! I HAVE NOT DONE SLEEP YET !
-
 # empty environment
 rm(list = ls())
 
@@ -16,7 +14,7 @@ rm(list = ls())
 library(dplyr); library(ggplot2);library(ggnewscale);library(viridis);library(lubridate);library(readr)
 
 # week indicator
-week_indicator = "week_1"
+week_indicator = "week_3"
 
 # load redcap from CCH for uids and start and end times
 redcap = read_csv("/Volumes/FS/_ISPM/CCH/Actual_Project/data/App_Personal_Data_Screening/redcap_data.csv") |>
@@ -24,7 +22,7 @@ redcap = read_csv("/Volumes/FS/_ISPM/CCH/Actual_Project/data/App_Personal_Data_S
          endtime   = ymd_hms(endtime),
          redcap_event_name = substr(redcap_event_name, 13,18)) |>
   filter(redcap_event_name == week_indicator)|>
-  filter(!(uid %in% c("ACT029U", "ACT034X", "ACT045O"))) |>
+  filter(!(uid %in% c("ACT029U", "ACT034X", "ACT045O", "ACT048L", "ACT051G", "ACT060E"))) |>
   filter(str_starts(uid, "ACT"))
 
 
@@ -85,12 +83,16 @@ for(uid in uids){
 
   # save the raw and hourly aggregated data for every participant
   write_csv(mdat, paste0("/Volumes/FS/_ISPM/CCH/Actual_Project/data-raw/Actigraph/participants/", week_indicator, "/",uid, "/", uid, "_week1_actigraph_validation_RAW.csv"))
+  
+  # assign uid
+  mdat <- mdat |>
+    mutate(uid = uid)
 
   # rbind to all participants data set
   df_validation = rbind(df_validation, mdat)
 }
 
 # save the raw rbinded data
-write_csv(df_validation, "/Volumes/FS/_ISPM/CCH/Actual_Project/data/Participants/", week_indicator, "/", week_indicator,  "_actigraph_validation_RAW.csv")
+write_csv(df_validation, paste0("/Volumes/FS/_ISPM/CCH/Actual_Project/data/Participants/", week_indicator, "/", week_indicator,  "_actigraph_validation_RAW.csv"))
 
 
