@@ -14,12 +14,12 @@ rm(list = ls())
 library(lubridate);library(readr);library(tidyverse)
 
 # specify the week to compile (needs to match naming convention on synology)
-week_indicator = "week_1"
+week_indicator = "week_3"
 
 # load redcap from CCH for uids and start and end times
 redcap = read_csv("/Volumes/FS/_ISPM/CCH/Actual_Project/data/App_Personal_Data_Screening/redcap_all.csv") |> 
   filter(str_detect(redcap_event_name, week_indicator)) |>
-  filter(!(uid %in% c("ACT029U", "ACT034X", "ACT045O"))) |>
+  filter(!(uid %in% c("ACT029U", "ACT034X", "ACT045O", "ACT048L", "ACT051G", "ACT060E"))) |>
   filter(str_starts(uid, "ACT")) 
 
 # vector of all uids

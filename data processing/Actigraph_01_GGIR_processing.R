@@ -23,7 +23,7 @@ redcap = read_csv("/Volumes/FS/_ISPM/CCH/Actual_Project/data/App_Personal_Data_S
                 endtime   = ymd_hms(endtime),
                 redcap_event_name = substr(redcap_event_name, 13,18)) |>
   filter(redcap_event_name == week_indicator)|>
-  filter(!(uid %in% c("ACT029U", "ACT034X", "ACT045O"))) |>
+  filter(!(uid %in% c("ACT029U", "ACT034X", "ACT045O", "ACT048L", "ACT051G", "ACT060E"))) |>
   filter(str_starts(uid, "ACT"))
 
 uids <- unique(redcap$uid)
@@ -34,6 +34,7 @@ uids <- unique(redcap$uid)
 for (uid in uids) {
   print(uid)
   folderpath <- paste0("/Volumes/FS/_ISPM/CCH/Actual_Project/data-raw/Actigraph/participants/", week_indicator, "/", uid)
+  print("Subfolder for uid already exists!")
   
   if (!dir.exists(folderpath)) {
     dir.create(folderpath, recursive = TRUE)
@@ -47,8 +48,10 @@ for (uid in uids) {
 # Step 2
 # copy the .RAW files from the csv folder only of week_1 to the corresponding folder
 files <- list.files("/Volumes/FS/_ISPM/CCH/Actual_Project/data-raw/Actigraph/csv/",
-                    pattern = "ACT.*week2.*RAW.*\\.csv$", 
+                    pattern = "ACT.*week3.*RAW.*\\.csv$", 
                     full.names = TRUE)
+
+files <- files[c(1:48, 50:72)]
 
 for (uid in uids) {
   print(uid)
@@ -65,7 +68,8 @@ for (uid in uids) {
   # only copy if file doesn't already exist
   if (!file.exists(output_loc)) {
     file.copy(from = selected_file, to = output_loc)
-  }
+    print("file copied successfully!")
+  } else {print("file already in folder!")}
 }
 
 

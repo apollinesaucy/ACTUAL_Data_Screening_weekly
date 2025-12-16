@@ -213,7 +213,7 @@ redcap_pvl_clean <- redcap_pvl |>
     pvl_sck_id_flag = ifelse(n_distinct(pvl_sckid, na.rm = T) == 1, 0, 1),
   )
   
-summary(redcap_pvl_clean[,48:66])
+# summary(redcap_pvl_clean[,48:66])
 
 
 
